@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 import plotly.express as px

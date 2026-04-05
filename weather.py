@@ -37,7 +37,7 @@ def get_coordinates(city_name):
 lat, lon, exact_name = get_coordinates(city_query)
 
 # If the user types a typo or a fake city, we show an error instead of crashing
-if lat is None
+if lat is None:
     st.error(f"Could not find coordinates for '{city_query}'. Please check your spelling!")
 else:
     # Tell the user exactly what location we locked onto

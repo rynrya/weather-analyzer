@@ -122,7 +122,7 @@ else:
                 """
                 
                 # 4. Generate the response
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 ai_answer = model.generate_content(system_prompt)
                 
                 st.success(ai_answer.text)

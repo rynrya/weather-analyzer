@@ -1,8 +1,6 @@
 streamlit
 requests
-pandas
 scikit-learn
 plotly
-numpy
-pandasai
+pandas
 google-generativeai

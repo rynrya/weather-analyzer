@@ -1,102 +1,130 @@
 import streamlit as st
 import requests
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-import numpy as np
 import plotly.express as px
+from sklearn.ensemble import RandomForestRegressor
+import google.generativeai as genai
 
+# --- 1. PAGE CONFIGURATION ---
+st.set_page_config(page_title="Climate AI Forecaster", layout="wide")
+st.title("Next-Gen Temperature Forecaster 🌤️")
 
-# 1. SET UP THE WEB PAGE
-st.set_page_config(page_title="Weather AI", layout="wide")
-st.title("🌡️ AI Weather Predictor & Analyzer")
+st.sidebar.header("Search Parameters 🔍")
+st.sidebar.write("Input any global location to generate a custom 2027 forecast model.")
 
-st.sidebar.header("🌍 World Tour Search")
-st.sidebar.write("Type any city on Earth to analyze its history and predict 2024!")
+user_target_city = st.sidebar.text_input("Target Location:", "New York")
 
-# --- THE NEW GLOBAL SEARCH ENGINE ---
-# This creates a blank search bar for you to type in
-city_query = st.sidebar.text_input("Enter a city name:", "Delhi")
-
-# The digital phone book function
-def get_coordinates(city_name):
-    # This API translates city names into GPS coordinates
-    geocode_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1&language=en&format=json"
-    response = requests.get(geocode_url).json()
+# --- 2. GPS LOOKUP FUNCTION ---
+def fetch_gps_data(location_string):
+    """Hits the geocoding API to find exact latitude and longitude."""
+    api_endpoint = f"https://geocoding-api.open-meteo.com/v1/search?name={location_string}&count=1&language=en&format=json"
+    api_reply = requests.get(api_endpoint).json()
     
-    # If the API successfully finds the city on the map
-    if "results" in response:
-        lat = response["results"][0]["latitude"]
-        lon = response["results"][0]["longitude"]
-        country = response["results"][0].get("country", "")
-        full_name = f"{response['results'][0]['name']}, {country}"
-        return lat, lon, full_name
-    else:
-        return None, None, None
+    if "results" in api_reply:
+        target_lat = api_reply["results"][0]["latitude"]
+        target_lon = api_reply["results"][0]["longitude"]
+        target_country = api_reply["results"][0].get("country", "")
+        formatted_name = f"{api_reply['results'][0]['name']}, {target_country}"
+        return target_lat, target_lon, formatted_name
+    return None, None, None
 
-# Run the search!
-lat, lon, exact_name = get_coordinates(city_query)
+latitude, longitude, official_city_name = fetch_gps_data(user_target_city)
 
-# If the user types a typo or a fake city, we show an error instead of crashing
-if lat is None:
-    st.error(f"Could not find coordinates for '{city_query}'. Please check your spelling!")
+# --- 3. CORE LOGIC & DASHBOARD ---
+if latitude is None:
+    st.error(f"Error: Unable to locate '{user_target_city}'. Please verify the spelling.")
 else:
-    # Tell the user exactly what location we locked onto
-    st.sidebar.success(f"Located: {exact_name} (Lat: {lat:.2f}, Lon: {lon:.2f})")
+    st.sidebar.success(f"Successfully locked onto: {official_city_name}")
 
-    # 2. CACHE THE DATA
+    # Data Retrieval caching
     @st.cache_data
-    def load_data(latitude, longitude):
-# Notice the end_date is now updated to pull data up to early 2026
-        weather_url = f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date=2016-01-01&end_date=2026-03-31&daily=temperature_2m_max&timezone=auto"        
-        data = requests.get(weather_url).json()
-        df = pd.DataFrame(data["daily"])
-        df['time'] = pd.to_datetime(df['time'])
-        df['Year'] = df['time'].dt.year
-        df['Month'] = df['time'].dt.month
-        df['Day'] = df['time'].dt.day
-        return df
+    def pull_historical_climate(lat, lon):
+        weather_url = f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date=2016-01-01&end_date=2026-03-31&daily=temperature_2m_max&timezone=auto"
+        raw_json = requests.get(weather_url).json()
+        climate_table = pd.DataFrame(raw_json["daily"])
+        
+        climate_table['time'] = pd.to_datetime(climate_table['time'])
+        climate_table['Year'] = climate_table['time'].dt.year
+        climate_table['Month'] = climate_table['time'].dt.month
+        climate_table['Day'] = climate_table['time'].dt.day
+        return climate_table
 
-    # We feed the dynamic GPS coordinates to our AI
-    df = load_data(lat, lon)
+    historical_df = pull_historical_climate(latitude, longitude)
 
-    # 3. INTERACTIVE Q&A SECTION
-    st.subheader(f"💬 Ask the Data about {exact_name}")
-    question = st.text_input("Type your question here (e.g., 'What was the hottest day?', 'Coldest day?'):").lower()
+    # --- 4. MACHINE LEARNING ENGINE ---
+    st.subheader(f"📊 2027 Predictive Model: {official_city_name}")
 
-    if "hottest" in question:
-        hottest_row = df.loc[df['temperature_2m_max'].idxmax()]
-        st.success(f"🔥 The absolute hottest day in {exact_name} was {hottest_row['time'].date()} at {hottest_row['temperature_2m_max']}°C.")
-    elif "coldest" in question:
-        coldest_row = df.loc[df['temperature_2m_max'].idxmin()]
-        st.info(f"❄️ The absolute coldest day in {exact_name} was {coldest_row['time'].date()} at {coldest_row['temperature_2m_max']}°C.")
-    elif question != "":
-        st.warning("I'm still learning! Try asking about the 'hottest' or 'coldest' day.")
+    features = historical_df[['Year', 'Month', 'Day']] 
+    target = historical_df['temperature_2m_max']
+    
+    rf_engine = RandomForestRegressor(n_estimators=18, max_depth=12, n_jobs=-1, random_state=99)
+    rf_engine.fit(features, target) 
 
-    st.divider() 
+    upcoming_days = pd.date_range(start='2027-01-01', end='2027-12-31')
+    prediction_calendar = pd.DataFrame({
+        'Year': upcoming_days.year, 
+        'Month': upcoming_days.month, 
+        'Day': upcoming_days.day
+    })
+    
+    forecasted_temps = rf_engine.predict(prediction_calendar)
 
-    # 4. THE AI & GRAPH SECTION
-    st.subheader(f"📈 2024 AI Temperature Forecast for {exact_name}")
+    # --- 5. INTERACTIVE PLOTLY VISUALIZATION ---
+    past_records = pd.DataFrame({'Timeline': historical_df['time'], 'Heat Level': target, 'Dataset': 'Archived Data'})
+    future_records = pd.DataFrame({'Timeline': upcoming_days, 'Heat Level': forecasted_temps, 'Dataset': 'AI Prediction'})
+    master_chart_data = pd.concat([past_records, future_records])
 
-    X = df[['Year', 'Month', 'Day']] 
-    y = df['temperature_2m_max']
-    model = RandomForestRegressor(n_estimators=15, max_depth=10, n_jobs=-1, random_state=42)
-    model.fit(X, y) 
+    interactive_chart = px.line(
+        master_chart_data, 
+        x='Timeline', 
+        y='Heat Level', 
+        color='Dataset',
+        title=f"Historical Climate vs 2027 Forecast ({official_city_name})",
+        color_discrete_sequence=['#555555', '#ffaa00'] 
+    )
+    
+    st.plotly_chart(interactive_chart, use_container_width=True)
 
-    future_dates = pd.date_range(start='2027-01-01', end='2027-12-31')
-    future_df = pd.DataFrame({'Year': future_dates.year, 'Month': future_dates.month, 'Day': future_dates.day})
-    predictions_2024 = model.predict(future_df)
+    st.divider()
 
+    # --- 6. CUSTOM AI DATA AGENT ---
+    st.subheader("🧠 Chat with the Weather AI")
+    user_query = st.text_input("Ask about the data (e.g., 'What was the hottest day?', 'What is the average temperature?'):")
 
-    # --- THE INTERACTIVE GRAPH UPGRADE ---
-    # We package our past history and future predictions into one clean format
-    history_df = pd.DataFrame({'Date': df['time'], 'Temperature': y, 'Type': 'Actual History'})
-    future_df_plot = pd.DataFrame({'Date': future_dates, 'Temperature': predictions_2024, 'Type': '2024 AI Forecast'})
-    combined_df = pd.concat([history_df, future_df_plot])
-
-    # Plotly draws a dynamic, hoverable graph instantly
-    fig = px.line(combined_df, x='Date', y='Temperature', color='Type',
-                title=f"{exact_name} - Interactive Temperature Forecast",
-                color_discrete_sequence=['#888888', '#00ff00']) # Gray for past, Neon Green for future
-
-    # Display it perfectly fitted to your Streamlit webpage
-    st.plotly_chart(fig, use_container_width=True)
+    if user_query:
+        with st.spinner("The AI is analyzing the data cheat sheet..."):
+            try:
+                # 1. Authenticate with Gemini
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                # 2. Build the "Cheat Sheet" for the AI
+                df_summary = historical_df['temperature_2m_max'].describe().to_string()
+                hottest_idx = historical_df['temperature_2m_max'].idxmax()
+                coldest_idx = historical_df['temperature_2m_max'].idxmin()
+                
+                hottest_day = historical_df.loc[hottest_idx]
+                coldest_day = historical_df.loc[coldest_idx]
+                
+                # 3. Write the instructions for the AI
+                system_prompt = f"""
+                You are a data science assistant built into a Streamlit dashboard for {official_city_name}. 
+                You are looking at a dataset of daily maximum temperatures from 2016 to 2026.
+                
+                Here is the statistical summary of the temperatures (in Celsius):
+                {df_summary}
+                
+                Notable Records:
+                - Absolute Hottest Day: {hottest_day['time'].date()} at {hottest_day['temperature_2m_max']}°C
+                - Absolute Coldest Day: {coldest_day['time'].date()} at {coldest_day['temperature_2m_max']}°C
+                
+                Answer the user's question clearly and concisely based ONLY on this provided data context. 
+                User Question: {user_query}
+                """
+                
+                # 4. Generate the response
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                ai_answer = model.generate_content(system_prompt)
+                
+                st.success(ai_answer.text)
+            except Exception as e:
+                st.error(f"Something went wrong with the AI connection: {e}")

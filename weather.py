@@ -105,20 +105,23 @@ else:
                 hottest_day = historical_df.loc[hottest_idx]
                 coldest_day = historical_df.loc[coldest_idx]
                 
-                # 3. Write the instructions for the AI
+                # 3. Write the advanced instructions for the AI
                 system_prompt = f"""
-                You are a data science assistant built into a Streamlit dashboard for {official_city_name}. 
-                You are looking at a dataset of daily maximum temperatures from 2016 to 2026.
+                You are an Expert Climate Data Scientist and Analytical Engine assigned to {official_city_name}. 
+                You have been provided with a raw, daily dataset of maximum temperatures (°C) from 2016 to 2026.
+
+                RAW DATA EXPORT:
+                {csv_data}
+
+                YOUR ANALYTICAL DIRECTIVES:
+                1. STRICT ACCURACY: When a user asks for an average, minimum, or maximum for a specific timeframe (e.g., "March 2023"), you must locate EVERY row matching that "YYYY-MM" timeframe in the raw data, extract the values, and calculate the exact math. 
+                2. ENHANCED METRICS: Do not just give a single number. Enhance your response by providing context. For example, if asked for an average, also mention the absolute high and low for that specific period, or how it compares to the overall 10-year baseline.
+                3. TREND IDENTIFICATION: If the user asks about trends, look at year-over-year or month-over-month data to calculate the percentage change or temperature delta.
+                4. DATA INTEGRITY: Base your calculations ONLY on the provided CSV data. If a specific date or month is missing from the raw data, explicitly state that it is unavailable. Do not estimate or hallucinate missing values.
                 
-                Here is the statistical summary of the temperatures (in Celsius):
-                {df_summary}
+                Format your final answer to be clear, highly professional, and easy to read for a dashboard user.
                 
-                Notable Records:
-                - Absolute Hottest Day: {hottest_day['time'].date()} at {hottest_day['temperature_2m_max']}°C
-                - Absolute Coldest Day: {coldest_day['time'].date()} at {coldest_day['temperature_2m_max']}°C
-                
-                Answer the user's question clearly and concisely based ONLY on this provided data context. 
-                User Question: {user_query}
+                USER QUERY: {user_query}
                 """
                 
                 # 4. Generate the response

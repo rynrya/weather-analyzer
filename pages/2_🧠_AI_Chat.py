@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+import datetime
 from utils.data_manager import fetch_gps_data, pull_historical_climate, generate_2027_forecast
 
 st.set_page_config(page_title="AI Chat", page_icon="🧠", layout="wide")
@@ -29,9 +30,14 @@ if user_query:
             historical_csv = historical_df[cols].to_csv(index=False)
             prediction_csv = future_df[cols].to_csv(index=False)
             
+            today_date = datetime.date.today()
+            
             system_prompt = f"""
             You are an Expert Meteorologist assigned to {official_name} (Lat: {lat}, Lon: {lon}).
             
+            CRITICAL CONTEXT: Today's actual, real-world date is {today_date}. 
+            If the user asks about "today", "tomorrow", or a certain number of days from now, calculate the target date based on {today_date}.
+
             HISTORICAL DATA (2016-2026):
             {historical_csv}
             

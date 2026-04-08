@@ -43,3 +43,12 @@ def generate_2027_forecast(historical_df):
     future_df = pd.DataFrame(forecasted_data, columns=targets.columns)
     future_df['time'] = upcoming_days
     return future_df
+
+@st.cache_data
+def pull_realtime_forecast(lat, lon):
+    """Fetches the 7-day real-time weather forecast."""
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto"
+    raw_json = requests.get(url).json()
+    df = pd.DataFrame(raw_json["daily"]).dropna()
+    df['time'] = pd.to_datetime(df['time'])
+    return df

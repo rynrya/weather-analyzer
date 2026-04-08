@@ -31,7 +31,7 @@ if user_query:
             prediction_csv = future_df[cols].to_csv(index=False)
             
             today_date = datetime.date.today()
-            
+
             system_prompt = f"""
             You are an Expert Meteorologist assigned to {official_name} (Lat: {lat}, Lon: {lon}).
             

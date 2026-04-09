@@ -1,7 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import datetime
-from utils.data_manager import fetch_gps_data, pull_historical_climate, generate_2027_forecast
+from utils.data_manager import fetch_gps_data, pull_historical_climate, generate_2027_forecast, pull_realtime_forecast
 
 st.set_page_config(page_title="AI Chat", page_icon="🧠", layout="wide")
 
@@ -25,10 +25,12 @@ if user_query:
             # Fetch data quietly
             historical_df = pull_historical_climate(lat, lon)
             future_df = generate_2027_forecast(historical_df)
-            
+            realtime_df = pull_realtime_forecast(lat, lon)
+
             cols = ['time', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'wind_speed_10m_max']
             historical_csv = historical_df[cols].to_csv(index=False)
             prediction_csv = future_df[cols].to_csv(index=False)
+            realtime_csv = realtime_df[cols].to_csv(index=False)
             
             today_date = datetime.date.today()
 
@@ -43,6 +45,9 @@ if user_query:
             
             PREDICTED DATA (2027):
             {prediction_csv}
+
+            CURRENT 7-DAY FORECAST (Real-Time Live Data):
+            {realtime_csv}
             
             DIRECTIVES: Use exact math based on the YYYY-MM dates provided. Contrast past data with 2027 predictions when relevant. Provide context (max/mins) when giving averages. Base answers ONLY on this data.
             
